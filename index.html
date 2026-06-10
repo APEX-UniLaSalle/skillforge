@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>SkillQuest — Sélecteur de compétences</title>
+<title>SkillForge — Sélecteur de compétences</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
@@ -124,7 +124,7 @@
 <div id="pwGate" style="position:fixed;inset:0;background:#0F172A;display:flex;align-items:center;justify-content:center;z-index:9999;">
   <div style="background:white;border-radius:20px;padding:40px 48px;text-align:center;box-shadow:0 32px 80px rgba(0,0,0,0.5);max-width:380px;width:90%;">
     <div style="width:52px;height:52px;background:linear-gradient(135deg,#4F46E5,#7C3AED);border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:1.6rem;margin:0 auto 18px;">🎯</div>
-    <div style="font-size:1.3rem;font-weight:800;color:#0F172A;margin-bottom:5px;letter-spacing:-0.03em;font-family:'Inter',sans-serif;">SkillQuest</div>
+    <div style="font-size:1.3rem;font-weight:800;color:#0F172A;margin-bottom:5px;letter-spacing:-0.03em;font-family:'Inter',sans-serif;">SkillForge</div>
     <div style="font-size:0.78rem;color:#94A3B8;margin-bottom:26px;font-family:'Inter',sans-serif;font-weight:500;">UniLaSalle · Sélecteur de compétences</div>
     <input id="pwInput" type="password" placeholder="Mot de passe" autofocus
       style="width:100%;padding:10px 14px;border:1.5px solid #E2E8F0;border-radius:10px;font-size:0.92rem;text-align:center;margin-bottom:10px;font-family:'Inter',sans-serif;color:#0F172A;outline:none;transition:border-color 0.15s;" onfocus="this.style.borderColor='#818CF8'" onblur="this.style.borderColor='#E2E8F0'">
@@ -148,7 +148,7 @@
 </script>
 
 <header>
-  <h1>🎯 SkillQuest</h1>
+  <h1>🔩 SkillForge</h1>
   <span>Sélecteur de compétences obligatoires &amp; recommandées</span>
   <div class="profile-area">
     <span id="syncStatus" style="font-size:0.75rem;opacity:0.7;min-width:2rem;text-align:center"></span>
@@ -508,7 +508,8 @@ function renderList(f) {
       const isAuto = status==='PO'||status==='PR';
       const canAdd = !overT || status==='O' || status==='R';
 
-      const btnO = `<button class="sbtn o${status==='O'?' active':''}" onclick="handleBtn('${f}','${skill.label}','O')" ${isAuto||(!canAdd&&status!=='O')?'disabled':''} title="Obligatoire">O</button>`;
+      const canForceO = status === 'PR'; // préreq auto-recommandé → peut être forcé en Obligatoire
+      const btnO = `<button class="sbtn o${status==='O'?' active':''}" onclick="handleBtn('${f}','${skill.label}','O')" ${(!canForceO && isAuto)||(!isAuto&&!canAdd&&status!=='O')?'disabled':''} title="${canForceO?'Forcer en Obligatoire':'Obligatoire'}">${canForceO?'⬆O':'O'}</button>`;
       const btnR = `<button class="sbtn r${status==='R'?' active':''}" onclick="handleBtn('${f}','${skill.label}','R')" ${isAuto||(!canAdd&&status!=='R')?'disabled':''} title="Recommandé">R</button>`;
       const btnC = `<button class="sbtn c${status==='C'?' active':''}" onclick="handleBtn('${f}','${skill.label}','C')" ${isAuto?'disabled':''} title="Complémentaire">C</button>`;
 
@@ -545,8 +546,11 @@ function handleBtn(f, label, newState) {
   if (newState === 'O' || newState === 'R') {
     const xpO = getXP_oblig(f), xpR = getXP_reco(f);
     const m = getMarginal(f, label);
-    const freed = (status==='O' || status==='R') ? (skillMap[label]||{}).xp||0 : 0;
-    const newTotal = (xpO - (status==='O'?freed:0)) + (xpR - (status==='R'?freed:0)) + m.total;
+    const own = (skillMap[label]||{}).xp||0;
+    // Pour O/R/PO/PR : libérer l'XP déjà compté dans le bucket source
+    const freedO = (status==='O' || status==='PO') ? own : 0;
+    const freedR = (status==='R' || status==='PR') ? own : 0;
+    const newTotal = (xpO - freedO) + (xpR - freedR) + m.total;
     if (newTotal > s.budgetTotal) {
       alert(`Budget total (O+R) insuffisant.\n\nCe choix dépasserait le budget total de ${s.budgetTotal} XP.`);
       return;
