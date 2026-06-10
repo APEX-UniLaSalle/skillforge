@@ -231,7 +231,8 @@ function recomputePrereqs(f) {
   s.recommande.forEach(sel => {
     const all = getAllPrereqs(sel); all.delete(sel);
     all.forEach(p => {
-      if (!s.obligatoire.has(p) && !newPO.has(p) && !s.recommande.has(p)) newPR.add(p);
+      // Exclure les skills déjà explicitement choisis (O, PO, R, C)
+      if (!s.obligatoire.has(p) && !newPO.has(p) && !s.recommande.has(p) && !s.complementaire.has(p)) newPR.add(p);
     });
   });
   s.prereqs_reco = newPR;
@@ -508,9 +509,12 @@ function renderList(f) {
       const isAuto = status==='PO'||status==='PR';
       const canAdd = !overT || status==='O' || status==='R';
 
-      const canForceO = status === 'PR'; // préreq auto-recommandé → peut être forcé en Obligatoire
-      const btnO = `<button class="sbtn o${status==='O'?' active':''}" onclick="handleBtn('${f}','${skill.label}','O')" ${(!canForceO && isAuto)||(!isAuto&&!canAdd&&status!=='O')?'disabled':''} title="${canForceO?'Forcer en Obligatoire':'Obligatoire'}">${canForceO?'⬆O':'O'}</button>`;
-      const btnR = `<button class="sbtn r${status==='R'?' active':''}" onclick="handleBtn('${f}','${skill.label}','R')" ${isAuto||(!canAdd&&status!=='R')?'disabled':''} title="Recommandé">R</button>`;
+      const isPO = status === 'PO'; // prérequis forcé par un Obligatoire → tout grisé
+      const isPR = status === 'PR'; // prérequis d'un Recommandé → O et R actifs, C grisé
+      // PR : XP déjà dans le budget R, ne bloque pas sur budget
+      const canAddAdj = !overT || status==='O' || status==='R' || isPR;
+      const btnO = `<button class="sbtn o${status==='O'?' active':''}" onclick="handleBtn('${f}','${skill.label}','O')" ${isPO||(!canAddAdj&&status!=='O')?'disabled':''} title="${isPR?'Forcer en Obligatoire':'Obligatoire'}">O</button>`;
+      const btnR = `<button class="sbtn r${status==='R'?' active':''}" onclick="handleBtn('${f}','${skill.label}','R')" ${isPO||(!canAddAdj&&status!=='R')?'disabled':''} title="Recommandé">R</button>`;
       const btnC = `<button class="sbtn c${status==='C'?' active':''}" onclick="handleBtn('${f}','${skill.label}','C')" ${isAuto?'disabled':''} title="Complémentaire">C</button>`;
 
       itemEl.innerHTML = `
