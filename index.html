@@ -52,6 +52,7 @@
   .jauge-fill-dual .part-o { background: linear-gradient(90deg, #3B82F6, #6366F1); transition: width 0.4s cubic-bezier(0.4,0,0.2,1); }
   .jauge-fill-dual .part-r { background: linear-gradient(90deg, #F59E0B, #FBBF24); transition: width 0.4s cubic-bezier(0.4,0,0.2,1); }
   .jauge-fill-dual .part-c { background: #8B5CF6; transition: width 0.4s cubic-bezier(0.4,0,0.2,1); }
+  .jauge-breakdown { font-size: 0.68rem; font-weight: 500; opacity: 0.85; letter-spacing: 0.01em; white-space: nowrap; }
   .jauge-val { font-size: 0.68rem; color: #94A3B8; white-space: nowrap; min-width: 90px; font-weight: 500; }
   .jauge-val.over { color: #EF4444; font-weight: 700; }
 
@@ -252,6 +253,12 @@ function getXP_reco(f) {
   s.prereqs_reco.forEach(l => t += (skillMap[l]||{}).xp||0);
   return t;
 }
+function getXP_compl(f) {
+  const s = state[f];
+  let t = 0;
+  s.complementaire.forEach(l => { if (getSkillStatus(f, l) === 'C') t += (skillMap[l]||{}).xp||0; });
+  return t;
+}
 
 function getMarginal(f, label) {
   // XP marginal si on ajoute ce skill (pour O ou R, c'est le même calcul de nouveaux prereqs)
@@ -429,7 +436,17 @@ function renderList(f) {
   document.getElementById('jT-'+f).children[0].style.width = pctTotalO+'%';
   document.getElementById('jT-'+f).children[1].style.width = pctTotalR+'%';
   document.getElementById('jT-'+f).children[2].style.width = pctTotalC+'%';
-  document.getElementById('jTv-'+f).textContent = xpTotal+' / '+bT+' XP';
+  const xpC = getXP_compl(f);
+  const pO = bT > 0 ? Math.round(xpO / bT * 100) : 0;
+  const pR = bT > 0 ? Math.round(xpR / bT * 100) : 0;
+  const pC = bT > 0 && xpC > 0 ? Math.round(xpC / bT * 100) : 0;
+  const breakdown = (pO + pR + pC > 0)
+    ? `<br><span class="jauge-breakdown">` +
+      `<span style="color:#3B82F6">${pO}%</span>&thinsp;O` +
+      ` · <span style="color:#F59E0B">${pR}%</span>&thinsp;R` +
+      (pC > 0 ? ` · <span style="color:#8B5CF6">${pC}%</span>&thinsp;C` : '') +
+      `</span>` : '';
+  document.getElementById('jTv-'+f).innerHTML = `${xpTotal}&thinsp;/&thinsp;${bT}&thinsp;XP${breakdown}`;
   document.getElementById('jTv-'+f).className = 'jauge-val'+(overT?' over':'');
 
   // Pills
@@ -513,9 +530,11 @@ function renderList(f) {
       const isPR = status === 'PR'; // prérequis d'un Recommandé → O et R actifs, C grisé
       // PR : XP déjà dans le budget R, ne bloque pas sur budget
       const canAddAdj = !overT || status==='O' || status==='R' || isPR;
-      const btnO = `<button class="sbtn o${status==='O'?' active':''}" onclick="handleBtn('${f}','${skill.label}','O')" ${isPO||(!canAddAdj&&status!=='O')?'disabled':''} title="${isPR?'Forcer en Obligatoire':'Obligatoire'}">O</button>`;
-      const btnR = `<button class="sbtn r${status==='R'?' active':''}" onclick="handleBtn('${f}','${skill.label}','R')" ${isPO||(!canAddAdj&&status!=='R')?'disabled':''} title="Recommandé">R</button>`;
-      const btnC = `<button class="sbtn c${status==='C'?' active':''}" onclick="handleBtn('${f}','${skill.label}','C')" ${isAuto?'disabled':''} title="Complémentaire">C</button>`;
+      // Escape apostrophes pour éviter de casser l'attribut onclick
+      const safeLabel = skill.label.replace(/'/g, "\\'");
+      const btnO = `<button class="sbtn o${status==='O'?' active':''}" onclick="handleBtn('${f}','${safeLabel}','O')" ${isPO||(!canAddAdj&&status!=='O')?'disabled':''} title="${isPR?'Forcer en Obligatoire':'Obligatoire'}">O</button>`;
+      const btnR = `<button class="sbtn r${status==='R'?' active':''}" onclick="handleBtn('${f}','${safeLabel}','R')" ${isPO||(!canAddAdj&&status!=='R')?'disabled':''} title="Recommandé">R</button>`;
+      const btnC = `<button class="sbtn c${status==='C'?' active':''}" onclick="handleBtn('${f}','${safeLabel}','C')" ${isAuto?'disabled':''} title="Complémentaire">C</button>`;
 
       itemEl.innerHTML = `
         <div class="state-btns">${btnO}${btnR}${btnC}</div>
