@@ -283,13 +283,18 @@ function getXP_compl(f) {
 
 function getMarginal(f, label) {
   const s = state[f];
-  const allCovered = new Set([...s.obligatoire, ...s.prereqs_oblig, ...s.recommande, ...s.prereqs_reco]);
+  const allCovered  = new Set([...s.obligatoire, ...s.prereqs_oblig, ...s.recommande, ...s.prereqs_reco]);
+  const allOBucket  = new Set([...s.obligatoire, ...s.prereqs_oblig]);
   const allP = getAllPrereqs(label);
   allP.delete(label);
   const own = getSkillXP(f, label);
-  let extra = 0;
-  allP.forEach(p => { if (!allCovered.has(p)) extra += getSkillXP(f, p); });
-  return { own, extra, total: own + extra };
+  let extra  = 0; // prérequis totalement non couverts (nouveaux XP)
+  let extraO = 0; // prérequis déjà en R/PR qui migreraient vers O si sélectionné en O
+  allP.forEach(p => {
+    if (!allCovered.has(p)) extra += getSkillXP(f, p);
+    else if (!allOBucket.has(p)) extraO += getSkillXP(f, p);
+  });
+  return { own, extra, extraO, total: own + extra };
 }
 
 function setSkillState(f, label, newState) {
@@ -591,7 +596,10 @@ function renderList(f) {
 
       const skillXp = getSkillXP(f, skill.label);
       let xpStr = `<span>${skillXp} XP</span>`;
-      if ((status === 'C' || status === null) && marginal.extra > 0) xpStr = `<span>${marginal.total} XP<span class="xp-extra">+${marginal.extra} préreq.</span></span>`;
+      if ((status === 'C' || status === null) && marginal.extra > 0)
+        xpStr = `<span>${marginal.total} XP<span class="xp-extra">+${marginal.extra} préreq.</span></span>`;
+      else if ((status === 'C' || status === null) && marginal.extraO > 0)
+        xpStr = `<span>${skillXp} XP<span class="xp-extra" title="Prérequis déjà en R qui passeraient en O">+${marginal.extraO} si O</span></span>`;
 
       // Boutons état — seul le total bloque
       const isAuto = status==='PO'||status==='PR';
