@@ -747,7 +747,10 @@ function deserializeState(f, data) {
   state[f].obligatoire    = new Set(data.obligatoire    || []);
   state[f].recommande     = new Set(data.recommande     || []);
   state[f].complementaire = new Set(data.complementaire || []);
-  if (data.budgetTotal) { state[f].budgetTotal = data.budgetTotal; const el = document.getElementById('bT-'+f); if (el) el.value = data.budgetTotal; }
+  // budgetTotal toujours depuis BUDGETS_TOTAL (ne pas restaurer depuis les saves)
+  const bTDefault = BUDGETS_TOTAL[f] || 1000;
+  state[f].budgetTotal = bTDefault;
+  const elBT = document.getElementById('bT-'+f); if (elBT) elBT.value = bTDefault;
   if (data.budgetPct != null) { state[f].budgetPct = data.budgetPct; const el = document.getElementById('pO-'+f); if (el) el.value = data.budgetPct; }
   if (data.budgetPctReco  != null) { state[f].budgetPctReco  = data.budgetPctReco;  const el = document.getElementById('pR-'+f); if (el) el.value = data.budgetPctReco; }
   if (data.wasObligatoire) state[f].wasObligatoire = new Set(data.wasObligatoire);
