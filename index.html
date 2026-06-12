@@ -337,6 +337,7 @@ function buildPanelHTML(f) {
   const semOpts = semestres.map(s => `<option value="${s}">${s}</option>`).join('');
   const bT = BUDGETS_TOTAL[f]||1000;
   const pctOblig = Math.round((BUDGETS_OBLIG[f]||0) / bT * 100);
+  const bO = Math.round(bT * pctOblig / 100);
 
   return `
     <div class="panel-header">
