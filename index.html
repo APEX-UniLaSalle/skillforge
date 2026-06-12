@@ -240,7 +240,7 @@ function recomputePrereqs(f) {
     const all = getAllPrereqs(sel); all.delete(sel);
     all.forEach(p => {
       // Exclure les skills déjà explicitement choisis (O, PO, R, C)
-      if (!s.obligatoire.has(p) && !newPO.has(p) && !s.recommande.has(p) && !s.complementaire.has(p)) newPR.add(p);
+      if (!s.obligatoire.has(p) && !newPO.has(p) && !s.recommande.has(p)) newPR.add(p);
     });
   });
   s.prereqs_reco = newPR;
@@ -631,6 +631,17 @@ function handleBtn(f, label, newState) {
     setSkillState(f, label, null);
     renderList(f);
     return;
+  }
+
+  // Interdire C si la compétence est un prérequis d'un O ou R
+  if (newState === 'C') {
+    const isPrereqOfOR = [...s.obligatoire, ...s.recommande].some(sel => {
+      const p = getAllPrereqs(sel); p.delete(sel); return p.has(label);
+    });
+    if (isPrereqOfOR) {
+      alert(`"${label}" est un prérequis d'une compétence Obligatoire ou Recommandée et ne peut pas être mis en Complémentaire.`);
+      return;
+    }
   }
 
   // Contraintes budget
