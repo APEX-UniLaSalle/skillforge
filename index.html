@@ -194,8 +194,6 @@ FILIERES.forEach(f => {
     prereqs_reco: new Set(),   // auto-prereqs of recommandés (not already in oblig)
     budgetPct:      Math.round((BUDGETS_OBLIG[f]||0) / (BUDGETS_TOTAL[f]||1) * 100),
     budgetOblig:    BUDGETS_OBLIG[f] || 500,
-    budgetPctCompl: 20,
-    budgetCompl:    Math.round((BUDGETS_TOTAL[f]||1000) * 0.20),
     budgetPctReco:  33,
     budgetReco:     Math.round((BUDGETS_TOTAL[f]||1000) * 0.33),
     budgetTotal:    BUDGETS_TOTAL[f] || 1000,
@@ -209,14 +207,10 @@ FILIERES.forEach(f => {
   recoMeta[f] = new Set(SKILLS_DATA.filter(s => f in s.filieres && s.filieres[f] && /^S[1-6]$/.test(s.filieres[f])).map(s => s.label));
 });
 
-// Initialisation des états par défaut
+// Initialisation des états par défaut — tout en Complémentaire
 FILIERES.forEach(f => {
   SKILLS_DATA.filter(s => f in s.filieres).forEach(skill => {
-    if (recoMeta[f].has(skill.label)) {
-      state[f].recommande.add(skill.label);
-    } else {
-      state[f].complementaire.add(skill.label);
-    }
+    state[f].complementaire.add(skill.label);
   });
   recomputePrereqs(f);
 });
@@ -346,8 +340,6 @@ function buildPanelHTML(f) {
   const bT = BUDGETS_TOTAL[f]||1000;
   const pctOblig = Math.round((BUDGETS_OBLIG[f]||0) / bT * 100);
   const bO = Math.round(bT * pctOblig / 100);
-  const pctCompl = 20;
-  const bC = Math.round(bT * pctCompl / 100);
   const bR = Math.round(bT * 0.33);
 
   return `
@@ -368,11 +360,6 @@ function buildPanelHTML(f) {
           <input type="number" id="pR-${f}" value="33" min="0" max="100" step="1" class="pct-input">
           <span class="unit-suffix">%</span>
         </div>
-        <div class="budget-control">
-          <label>Compl. max :</label>
-          <input type="number" id="pC-${f}" value="${pctCompl}" min="0" max="100" step="1" class="pct-input">
-          <span class="unit-suffix">%</span>
-        </div>
         <div class="pills-row" id="pills-${f}"></div>
       </div>
       <div class="jauges">
@@ -389,7 +376,7 @@ function buildPanelHTML(f) {
         <div class="jauge-row">
           <span class="jauge-label compl">Complémentaires</span>
           <div class="jauge-bg"><div class="jauge-fill compl" id="jC-${f}" style="width:0%"></div></div>
-          <span class="jauge-val" id="jCv-${f}">0 / ${bC} XP</span>
+          <span class="jauge-val" id="jCv-${f}">0 XP</span>
         </div>
         <div class="jauge-row">
           <span class="jauge-label total">Total</span>
@@ -423,7 +410,7 @@ function buildPanelHTML(f) {
 }
 
 function attachEvents(f) {
-  ['pO','pR','pC','bT'].forEach(id => document.getElementById(id+'-'+f).addEventListener('input', () => renderList(f)));
+  ['pO','pR','bT'].forEach(id => document.getElementById(id+'-'+f).addEventListener('input', () => renderList(f)));
   ['search','typeF','domF','semF'].forEach(id => document.getElementById(id+'-'+f).addEventListener('input', () => renderList(f)));
   document.getElementById('reset-'+f).addEventListener('click', () => {
     // Les Obligatoires sont conservés — on ne réinitialise que Recommandé et Complémentaire
@@ -431,10 +418,8 @@ function attachEvents(f) {
     state[f].complementaire = new Set();
     SKILLS_DATA.filter(s => f in s.filieres).forEach(skill => {
       if (!state[f].obligatoire.has(skill.label)) {
-        // Compétences ayant été O → C par défaut (jamais R)
-        if (state[f].wasObligatoire.has(skill.label)) state[f].complementaire.add(skill.label);
-        else if (recoMeta[f].has(skill.label)) state[f].recommande.add(skill.label);
-        else state[f].complementaire.add(skill.label);
+        // Tout part en C par défaut (les wasObligatoire restent aussi en C)
+        state[f].complementaire.add(skill.label);
       }
     });
     recomputePrereqs(f);
@@ -450,14 +435,12 @@ function renderList(f) {
   s.budgetOblig    = Math.round(s.budgetTotal * s.budgetPct / 100);
   s.budgetPctReco  = parseInt(document.getElementById('pR-'+f).value)||0;
   s.budgetReco     = Math.round(s.budgetTotal * s.budgetPctReco / 100);
-  s.budgetPctCompl = parseInt(document.getElementById('pC-'+f).value)||0;
-  s.budgetCompl    = Math.round(s.budgetTotal * s.budgetPctCompl / 100);
 
   const xpO = getXP_oblig(f);
   const xpR = getXP_reco(f);
   const xpC = getXP_compl(f);
   const xpTotal = xpO + xpR;
-  const bO = s.budgetOblig, bT = s.budgetTotal, bC = s.budgetCompl, bR = s.budgetReco;
+  const bO = s.budgetOblig, bT = s.budgetTotal, bR = s.budgetReco;
 
   // Jauge Obligatoires
   const pctO = bO>0 ? Math.min(100,(xpO/bO)*100) : 0;
@@ -473,11 +456,10 @@ function renderList(f) {
   document.getElementById('jRv-'+f).textContent = xpR+' / '+bR+' XP';
   document.getElementById('jRv-'+f).className = 'jauge-val'+(overR?' over':'');
 
-  // Jauge Complémentaires
-  const overC = xpC > bC;
-  document.getElementById('jC-'+f).style.width = (bC>0 ? Math.min(100,(xpC/bC)*100) : 0)+'%';
-  document.getElementById('jCv-'+f).textContent = xpC+' / '+bC+' XP';
-  document.getElementById('jCv-'+f).className = 'jauge-val'+(overC?' over':'');
+  // Jauge Complémentaires (sans plafond)
+  document.getElementById('jC-'+f).style.width = (bT>0 ? Math.min(100,(xpC/bT)*100) : 0)+'%';
+  document.getElementById('jCv-'+f).textContent = xpC+' XP';
+  document.getElementById('jCv-'+f).className = 'jauge-val';
 
   // Jauge Total (bleu O + ambre R + violet restant)
   const overT = xpTotal > bT;
@@ -671,20 +653,6 @@ function handleBtn(f, label, newState) {
     }
   }
 
-  // 3. Vérif budget complémentaire — uniquement si on passe en C
-  if (newState === 'C') {
-    const xpC = getXP_compl(f);
-    const own = (skillMap[label]||{}).xp||0;
-    const allP = getAllPrereqs(label); allP.delete(label);
-    let extraToC = 0;
-    allP.forEach(p => { if (getSkillStatus(f, p) === null) extraToC += (skillMap[p]||{}).xp||0; });
-    const newXpCompl = xpC + own + extraToC;
-    if (newXpCompl > s.budgetCompl) {
-      alert(`Budget complémentaire (${s.budgetPctCompl}% = ${s.budgetCompl} XP) dépassé.\n\nCe choix porterait les Complémentaires à ${newXpCompl} XP.`);
-      return;
-    }
-  }
-
   setSkillState(f, label, newState);
 
   // Cascade C : pré-requis null → C
@@ -713,7 +681,6 @@ function serializeState(f) {
     complementaire:[...s.complementaire],
     budgetPct:      s.budgetPct,
     budgetTotal:    s.budgetTotal,
-    budgetPctCompl: s.budgetPctCompl,
     budgetPctReco:  s.budgetPctReco,
     wasObligatoire: [...s.wasObligatoire]
   };
@@ -726,7 +693,6 @@ function deserializeState(f, data) {
   state[f].complementaire = new Set(data.complementaire || []);
   if (data.budgetTotal) { state[f].budgetTotal = data.budgetTotal; const el = document.getElementById('bT-'+f); if (el) el.value = data.budgetTotal; }
   if (data.budgetPct != null) { state[f].budgetPct = data.budgetPct; const el = document.getElementById('pO-'+f); if (el) el.value = data.budgetPct; }
-  if (data.budgetPctCompl != null) { state[f].budgetPctCompl = data.budgetPctCompl; const el = document.getElementById('pC-'+f); if (el) el.value = data.budgetPctCompl; }
   if (data.budgetPctReco  != null) { state[f].budgetPctReco  = data.budgetPctReco;  const el = document.getElementById('pR-'+f); if (el) el.value = data.budgetPctReco; }
   if (data.wasObligatoire) state[f].wasObligatoire = new Set(data.wasObligatoire);
   recomputePrereqs(f);
