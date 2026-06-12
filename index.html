@@ -178,6 +178,7 @@ const BUDGETS_TOTAL = {
 };
 const FIREBASE_DB = 'https://skillquest-unilasalle-default-rtdb.firebaseio.com/skillquest';
 function sanitizeKey(s) { return s.replace(/[.#$\/\[\]]/g, '_'); }
+let userInteracted = false; // empêche loadFromCloud d'écraser un reset
 function setSyncStatus(msg) { const el=document.getElementById('syncStatus'); if(el) el.textContent=msg; }
 
 const skillMap = {};
@@ -413,21 +414,41 @@ function attachEvents(f) {
   ['pO','pR','bT'].forEach(id => document.getElementById(id+'-'+f).addEventListener('input', () => renderList(f)));
   ['search','typeF','domF','semF'].forEach(id => document.getElementById(id+'-'+f).addEventListener('input', () => renderList(f)));
   document.getElementById('reset-'+f).addEventListener('click', () => {
-    // Réinitialiser les filtres pour ne pas masquer le résultat du reset
-    document.getElementById('typeF-'+f).value = '';
-    document.getElementById('search-'+f).value = '';
-    document.getElementById('domF-'+f).value = '';
-    document.getElementById('semF-'+f).value = '';
-    // Les Obligatoires sont conservés — on ne réinitialise que Recommandé et Complémentaire
-    state[f].recommande = new Set();
-    state[f].complementaire = new Set();
-    SKILLS_DATA.filter(sk => f in sk.filieres).forEach(skill => {
-      if (!state[f].obligatoire.has(skill.label)) {
-        state[f].complementaire.add(skill.label);
-      }
-    });
-    recomputePrereqs(f);
-    renderList(f);
+    try {
+      userInteracted = true;
+      // Réinitialiser les filtres pour que les compétences soient visibles
+      document.getElementById('typeF-'+f).value = '';
+      document.getElementById('search-'+f).value = '';
+      document.getElementById('domF-'+f).value = '';
+      document.getElementById('semF-'+f).value = '';
+      // Reset état (O conservé, tout le reste → C)
+      state[f].recommande     = new Set();
+      state[f].complementaire = new Set();
+      state[f].wasObligatoire = new Set();
+      // Guard : s'assurer que wasObligatoire existe toujours
+      if (!state[f].wasObligatoire) state[f].wasObligatoire = new Set();
+      SKILLS_DATA.filter(sk => f in sk.filieres).forEach(skill => {
+        if (!state[f].obligatoire.has(skill.label)) {
+          state[f].complementaire.add(skill.label);
+        }
+      });
+      recomputePrereqs(f);
+      renderList(f);
+      // Confirmation visuelle
+      const btn = document.getElementById('reset-'+f);
+      btn.textContent = '✓ Réinitialisé';
+      btn.style.background = '#DCFCE7';
+      btn.style.borderColor = '#16A34A';
+      btn.style.color = '#15803D';
+      setTimeout(() => {
+        btn.textContent = 'Réinitialiser';
+        btn.style.background = '';
+        btn.style.borderColor = '';
+        btn.style.color = '';
+      }, 1500);
+    } catch(e) {
+      alert('Erreur reset : ' + e.message);
+    }
   });
   renderList(f);
 }
@@ -551,7 +572,7 @@ function renderList(f) {
       itemEl.className = cls;
 
       const marginal = getMarginal(f, skill.label);
-      const wasO = s.wasObligatoire.has(skill.label);
+      const wasO = s.wasObligatoire ? s.wasObligatoire.has(skill.label) : false;
       const semTag = semestre ? `<span class="badge badge-sem">${semestre}</span>` : '';
       const recoTag = isRecoMeta && status === 'C' && !wasO ? `<span class="badge badge-reco-tag">↩ Recommandée</span>` : '';
       const wasOTag = wasO && status === 'C' ? `<span class="badge badge-was-o">↩ Était O</span>` : '';
@@ -716,7 +737,7 @@ async function loadFromCloud() {
   try {
     const resp = await fetch(`${FIREBASE_DB}/selections.json`);
     const data = resp.ok ? await resp.json() : null;
-    if (data) {
+    if (data && !userInteracted) {
       FILIERES.forEach(f => {
         const entry = data[encodeURIComponent(f)] || data[f];
         if (entry) { deserializeState(f, entry); localStorage.setItem('sq_selection_' + f, JSON.stringify(entry)); }
