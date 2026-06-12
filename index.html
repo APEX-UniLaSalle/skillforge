@@ -99,6 +99,7 @@
   .badge-sem { background: #DBEAFE; color: #1D4ED8; }
   .badge-reco-tag { background: #FEF3C7; color: #B45309; }
   .badge-auto { background: #D1FAE5; color: #065F46; font-style: italic; }
+  .badge-was-o { background: #FEE2E2; color: #B91C1C; }
 
   .skill-xp { font-size: 0.78rem; font-weight: 700; color: #64748B; white-space: nowrap; min-width: 50px; text-align: right; flex-shrink: 0; }
   .skill-xp .xp-extra { font-size: 0.6rem; color: #CBD5E1; display: block; }
@@ -195,7 +196,10 @@ FILIERES.forEach(f => {
     budgetOblig:    BUDGETS_OBLIG[f] || 500,
     budgetPctCompl: 20,
     budgetCompl:    Math.round((BUDGETS_TOTAL[f]||1000) * 0.20),
+    budgetPctReco:  33,
+    budgetReco:     Math.round((BUDGETS_TOTAL[f]||1000) * 0.33),
     budgetTotal:    BUDGETS_TOTAL[f] || 1000,
+    wasObligatoire: new Set(),
   };
 });
 
@@ -344,6 +348,7 @@ function buildPanelHTML(f) {
   const bO = Math.round(bT * pctOblig / 100);
   const pctCompl = 20;
   const bC = Math.round(bT * pctCompl / 100);
+  const bR = Math.round(bT * 0.33);
 
   return `
     <div class="panel-header">
@@ -356,6 +361,11 @@ function buildPanelHTML(f) {
         <div class="budget-control">
           <label>dont Oblig. :</label>
           <input type="number" id="pO-${f}" value="${pctOblig}" min="0" max="100" step="1" class="pct-input">
+          <span class="unit-suffix">%</span>
+        </div>
+        <div class="budget-control">
+          <label>Reco. max :</label>
+          <input type="number" id="pR-${f}" value="33" min="0" max="100" step="1" class="pct-input">
           <span class="unit-suffix">%</span>
         </div>
         <div class="budget-control">
@@ -374,7 +384,7 @@ function buildPanelHTML(f) {
         <div class="jauge-row">
           <span class="jauge-label reco">Recommandés</span>
           <div class="jauge-bg"><div class="jauge-fill reco" id="jR-${f}" style="width:0%"></div></div>
-          <span class="jauge-val" id="jRv-${f}">0 XP</span>
+          <span class="jauge-val" id="jRv-${f}">0 / ${bR} XP</span>
         </div>
         <div class="jauge-row">
           <span class="jauge-label compl">Complémentaires</span>
@@ -413,7 +423,7 @@ function buildPanelHTML(f) {
 }
 
 function attachEvents(f) {
-  ['pO','pC','bT'].forEach(id => document.getElementById(id+'-'+f).addEventListener('input', () => renderList(f)));
+  ['pO','pR','pC','bT'].forEach(id => document.getElementById(id+'-'+f).addEventListener('input', () => renderList(f)));
   ['search','typeF','domF','semF'].forEach(id => document.getElementById(id+'-'+f).addEventListener('input', () => renderList(f)));
   document.getElementById('reset-'+f).addEventListener('click', () => {
     // Les Obligatoires sont conservés — on ne réinitialise que Recommandé et Complémentaire
@@ -421,7 +431,9 @@ function attachEvents(f) {
     state[f].complementaire = new Set();
     SKILLS_DATA.filter(s => f in s.filieres).forEach(skill => {
       if (!state[f].obligatoire.has(skill.label)) {
-        if (recoMeta[f].has(skill.label)) state[f].recommande.add(skill.label);
+        // Compétences ayant été O → C par défaut (jamais R)
+        if (state[f].wasObligatoire.has(skill.label)) state[f].complementaire.add(skill.label);
+        else if (recoMeta[f].has(skill.label)) state[f].recommande.add(skill.label);
         else state[f].complementaire.add(skill.label);
       }
     });
@@ -436,6 +448,8 @@ function renderList(f) {
   s.budgetTotal    = parseInt(document.getElementById('bT-'+f).value)||0;
   s.budgetPct      = parseInt(document.getElementById('pO-'+f).value)||0;
   s.budgetOblig    = Math.round(s.budgetTotal * s.budgetPct / 100);
+  s.budgetPctReco  = parseInt(document.getElementById('pR-'+f).value)||0;
+  s.budgetReco     = Math.round(s.budgetTotal * s.budgetPctReco / 100);
   s.budgetPctCompl = parseInt(document.getElementById('pC-'+f).value)||0;
   s.budgetCompl    = Math.round(s.budgetTotal * s.budgetPctCompl / 100);
 
@@ -443,7 +457,7 @@ function renderList(f) {
   const xpR = getXP_reco(f);
   const xpC = getXP_compl(f);
   const xpTotal = xpO + xpR;
-  const bO = s.budgetOblig, bT = s.budgetTotal, bC = s.budgetCompl;
+  const bO = s.budgetOblig, bT = s.budgetTotal, bC = s.budgetCompl, bR = s.budgetReco;
 
   // Jauge Obligatoires
   const pctO = bO>0 ? Math.min(100,(xpO/bO)*100) : 0;
@@ -454,8 +468,10 @@ function renderList(f) {
   document.getElementById('jOv-'+f).className = 'jauge-val'+(overO?' over':'');
 
   // Jauge Recommandés
-  document.getElementById('jR-'+f).style.width = (bT>0 ? Math.min(100,(xpR/bT)*100) : 0)+'%';
-  document.getElementById('jRv-'+f).textContent = xpR+' XP';
+  const overR = xpR > bR;
+  document.getElementById('jR-'+f).style.width = (bR>0 ? Math.min(100,(xpR/bR)*100) : 0)+'%';
+  document.getElementById('jRv-'+f).textContent = xpR+' / '+bR+' XP';
+  document.getElementById('jRv-'+f).className = 'jauge-val'+(overR?' over':'');
 
   // Jauge Complémentaires
   const overC = xpC > bC;
@@ -549,8 +565,10 @@ function renderList(f) {
       itemEl.className = cls;
 
       const marginal = getMarginal(f, skill.label);
+      const wasO = s.wasObligatoire.has(skill.label);
       const semTag = semestre ? `<span class="badge badge-sem">${semestre}</span>` : '';
-      const recoTag = isRecoMeta && status === 'C' ? `<span class="badge badge-reco-tag">↩ Recommandée</span>` : '';
+      const recoTag = isRecoMeta && status === 'C' && !wasO ? `<span class="badge badge-reco-tag">↩ Recommandée</span>` : '';
+      const wasOTag = wasO && status === 'C' ? `<span class="badge badge-was-o">↩ Était O</span>` : '';
       const autoTag = (status==='PO'||status==='PR') ? `<span class="badge badge-auto">prérequis auto</span>` : '';
 
       let xpStr = `<span>${skill.xp} XP</span>`;
@@ -573,7 +591,7 @@ function renderList(f) {
       itemEl.innerHTML = `
         <div class="state-btns">${btnO}${btnR}${btnC}</div>
         <div class="skill-info">
-          <div class="skill-name">${skill.label}${semTag}${recoTag}${autoTag}</div>
+          <div class="skill-name">${skill.label}${semTag}${recoTag}${wasOTag}${autoTag}</div>
           <div class="skill-meta">${skill.sousDomaine||skill.domaine}</div>
         </div>
         <div class="skill-xp">${xpStr}</div>
@@ -592,8 +610,19 @@ function handleBtn(f, label, newState) {
   const s = state[f];
   const status = getSkillStatus(f, label);
 
-  // Si déjà dans cet état → exclure (null)
-  if ((newState==='O' && status==='O') || (newState==='R' && status==='R') || (newState==='C' && status==='C')) {
+  // Mémoriser qu'une compétence quitte le statut O
+  if (status === 'O' && newState !== 'O') s.wasObligatoire.add(label);
+
+  // Si déjà dans cet état → toggle
+  if (newState==='O' && status==='O') {
+    // Rétrograder en C (jamais en R) et mémoriser
+    s.wasObligatoire.add(label);
+    setSkillState(f, label, 'C');
+    recomputePrereqs(f);
+    renderList(f);
+    return;
+  }
+  if ((newState==='R' && status==='R') || (newState==='C' && status==='C')) {
     setSkillState(f, label, null);
     renderList(f);
     return;
@@ -623,6 +652,20 @@ function handleBtn(f, label, newState) {
       const newXpOblig = (xpO - freedO) + own + extraToO;
       if (newXpOblig > s.budgetOblig) {
         alert(`Budget obligatoire (${s.budgetPct}% = ${s.budgetOblig} XP) dépassé.\n\nCe choix porterait les compétences O+PO à ${newXpOblig} XP.`);
+        return;
+      }
+    }
+
+    // 3. Vérif budget recommandé (R+PR) — uniquement si on passe en R
+    if (newState === 'R') {
+      const inRBucket = new Set([...s.recommande, ...s.prereqs_reco]);
+      const inOBucket = new Set([...s.obligatoire, ...s.prereqs_oblig]);
+      const allP = getAllPrereqs(label); allP.delete(label);
+      let extraToR = 0;
+      allP.forEach(p => { if (!inRBucket.has(p) && !inOBucket.has(p)) extraToR += (skillMap[p]||{}).xp||0; });
+      const newXpReco = (xpR - freedR) + own + extraToR;
+      if (newXpReco > s.budgetReco) {
+        alert(`Budget recommandé (${s.budgetPctReco}% = ${s.budgetReco} XP) dépassé.\n\nCe choix porterait les Recommandés à ${newXpReco} XP.`);
         return;
       }
     }
@@ -670,7 +713,9 @@ function serializeState(f) {
     complementaire:[...s.complementaire],
     budgetPct:      s.budgetPct,
     budgetTotal:    s.budgetTotal,
-    budgetPctCompl: s.budgetPctCompl
+    budgetPctCompl: s.budgetPctCompl,
+    budgetPctReco:  s.budgetPctReco,
+    wasObligatoire: [...s.wasObligatoire]
   };
 }
 
@@ -682,6 +727,8 @@ function deserializeState(f, data) {
   if (data.budgetTotal) { state[f].budgetTotal = data.budgetTotal; const el = document.getElementById('bT-'+f); if (el) el.value = data.budgetTotal; }
   if (data.budgetPct != null) { state[f].budgetPct = data.budgetPct; const el = document.getElementById('pO-'+f); if (el) el.value = data.budgetPct; }
   if (data.budgetPctCompl != null) { state[f].budgetPctCompl = data.budgetPctCompl; const el = document.getElementById('pC-'+f); if (el) el.value = data.budgetPctCompl; }
+  if (data.budgetPctReco  != null) { state[f].budgetPctReco  = data.budgetPctReco;  const el = document.getElementById('pR-'+f); if (el) el.value = data.budgetPctReco; }
+  if (data.wasObligatoire) state[f].wasObligatoire = new Set(data.wasObligatoire);
   recomputePrereqs(f);
 }
 
