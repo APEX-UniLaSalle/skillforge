@@ -159,6 +159,7 @@
   <div class="profile-area">
     <span id="syncStatus" style="font-size:0.75rem;opacity:0.7;min-width:2rem;text-align:center"></span>
     <button class="header-btn" onclick="saveToCloud()">💾 Sauvegarder</button>
+    <button class="header-btn" onclick="exportState()">⬇ Exporter</button>
     <label class="header-btn">⬆ Importer<input type="file" accept=".json" onchange="importState(event)" style="display:none"></label>
   </div>
 </header>
@@ -421,16 +422,13 @@ function attachEvents(f) {
       document.getElementById('search-'+f).value = '';
       document.getElementById('domF-'+f).value = '';
       document.getElementById('semF-'+f).value = '';
-      // Reset état (O conservé, tout le reste → C)
+      // Reset complet : tout → C
+      state[f].obligatoire    = new Set();
       state[f].recommande     = new Set();
       state[f].complementaire = new Set();
       state[f].wasObligatoire = new Set();
-      // Guard : s'assurer que wasObligatoire existe toujours
-      if (!state[f].wasObligatoire) state[f].wasObligatoire = new Set();
       SKILLS_DATA.filter(sk => f in sk.filieres).forEach(skill => {
-        if (!state[f].obligatoire.has(skill.label)) {
-          state[f].complementaire.add(skill.label);
-        }
+        state[f].complementaire.add(skill.label);
       });
       recomputePrereqs(f);
       renderList(f);
@@ -760,6 +758,19 @@ async function saveToCloud() {
     });
     setSyncStatus('☁️ ok');
   } catch(e) { setSyncStatus('⚠️'); }
+}
+
+function exportState() {
+  const data = { filieres: {} };
+  FILIERES.forEach(f => { data.filieres[f] = serializeState(f); });
+  const json = JSON.stringify(data, null, 2);
+  const blob = new Blob([json], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'skillquest_' + new Date().toISOString().slice(0,10) + '.json';
+  a.click();
+  URL.revokeObjectURL(url);
 }
 
 function importState(e) {
