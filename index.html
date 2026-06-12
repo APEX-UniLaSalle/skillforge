@@ -45,11 +45,13 @@
   .jauge-label { font-size: 0.65rem; font-weight: 700; width: 110px; flex-shrink: 0; text-transform: uppercase; letter-spacing: 0.05em; }
   .jauge-label.oblig { color: #3B82F6; }
   .jauge-label.reco  { color: #F59E0B; }
+  .jauge-label.compl { color: #8B5CF6; }
   .jauge-label.total { color: #94A3B8; }
   .jauge-bg { flex: 1; height: 7px; background: #F1F5F9; border-radius: 99px; overflow: hidden; position: relative; }
   .jauge-fill { height: 100%; border-radius: 99px; transition: width 0.4s cubic-bezier(0.4,0,0.2,1); }
   .jauge-fill.oblig { background: linear-gradient(90deg, #3B82F6, #6366F1); }
   .jauge-fill.reco  { background: linear-gradient(90deg, #F59E0B, #FBBF24); }
+  .jauge-fill.compl { background: linear-gradient(90deg, #8B5CF6, #A78BFA); }
   .jauge-fill-dual { height: 100%; display: flex; }
   .jauge-fill-dual .part-o { background: linear-gradient(90deg, #3B82F6, #6366F1); transition: width 0.4s cubic-bezier(0.4,0,0.2,1); }
   .jauge-fill-dual .part-r { background: linear-gradient(90deg, #F59E0B, #FBBF24); transition: width 0.4s cubic-bezier(0.4,0,0.2,1); }
@@ -189,9 +191,11 @@ FILIERES.forEach(f => {
     complementaire: new Set(),
     prereqs_oblig: new Set(),  // auto-prereqs of obligatoires
     prereqs_reco: new Set(),   // auto-prereqs of recommandés (not already in oblig)
-    budgetPct:   Math.round((BUDGETS_OBLIG[f]||0) / (BUDGETS_TOTAL[f]||1) * 100),
-    budgetOblig: BUDGETS_OBLIG[f] || 500,
-    budgetTotal: BUDGETS_TOTAL[f] || 1000,
+    budgetPct:      Math.round((BUDGETS_OBLIG[f]||0) / (BUDGETS_TOTAL[f]||1) * 100),
+    budgetOblig:    BUDGETS_OBLIG[f] || 500,
+    budgetPctCompl: 20,
+    budgetCompl:    Math.round((BUDGETS_TOTAL[f]||1000) * 0.20),
+    budgetTotal:    BUDGETS_TOTAL[f] || 1000,
   };
 });
 
@@ -338,6 +342,8 @@ function buildPanelHTML(f) {
   const bT = BUDGETS_TOTAL[f]||1000;
   const pctOblig = Math.round((BUDGETS_OBLIG[f]||0) / bT * 100);
   const bO = Math.round(bT * pctOblig / 100);
+  const pctCompl = 20;
+  const bC = Math.round(bT * pctCompl / 100);
 
   return `
     <div class="panel-header">
@@ -352,6 +358,11 @@ function buildPanelHTML(f) {
           <input type="number" id="pO-${f}" value="${pctOblig}" min="0" max="100" step="1" class="pct-input">
           <span class="unit-suffix">%</span>
         </div>
+        <div class="budget-control">
+          <label>Compl. max :</label>
+          <input type="number" id="pC-${f}" value="${pctCompl}" min="0" max="100" step="1" class="pct-input">
+          <span class="unit-suffix">%</span>
+        </div>
         <div class="pills-row" id="pills-${f}"></div>
       </div>
       <div class="jauges">
@@ -364,6 +375,11 @@ function buildPanelHTML(f) {
           <span class="jauge-label reco">Recommandés</span>
           <div class="jauge-bg"><div class="jauge-fill reco" id="jR-${f}" style="width:0%"></div></div>
           <span class="jauge-val" id="jRv-${f}">0 XP</span>
+        </div>
+        <div class="jauge-row">
+          <span class="jauge-label compl">Complémentaires</span>
+          <div class="jauge-bg"><div class="jauge-fill compl" id="jC-${f}" style="width:0%"></div></div>
+          <span class="jauge-val" id="jCv-${f}">0 / ${bC} XP</span>
         </div>
         <div class="jauge-row">
           <span class="jauge-label total">Total</span>
@@ -397,15 +413,17 @@ function buildPanelHTML(f) {
 }
 
 function attachEvents(f) {
-  ['pO','bT'].forEach(id => document.getElementById(id+'-'+f).addEventListener('input', () => renderList(f)));
+  ['pO','pC','bT'].forEach(id => document.getElementById(id+'-'+f).addEventListener('input', () => renderList(f)));
   ['search','typeF','domF','semF'].forEach(id => document.getElementById(id+'-'+f).addEventListener('input', () => renderList(f)));
   document.getElementById('reset-'+f).addEventListener('click', () => {
-    state[f].obligatoire = new Set();
+    // Les Obligatoires sont conservés — on ne réinitialise que Recommandé et Complémentaire
     state[f].recommande = new Set();
     state[f].complementaire = new Set();
     SKILLS_DATA.filter(s => f in s.filieres).forEach(skill => {
-      if (recoMeta[f].has(skill.label)) state[f].recommande.add(skill.label);
-      else state[f].complementaire.add(skill.label);
+      if (!state[f].obligatoire.has(skill.label)) {
+        if (recoMeta[f].has(skill.label)) state[f].recommande.add(skill.label);
+        else state[f].complementaire.add(skill.label);
+      }
     });
     recomputePrereqs(f);
     renderList(f);
@@ -415,16 +433,19 @@ function attachEvents(f) {
 
 function renderList(f) {
   const s = state[f];
-  s.budgetTotal = parseInt(document.getElementById('bT-'+f).value)||0;
-  s.budgetPct   = parseInt(document.getElementById('pO-'+f).value)||0;
-  s.budgetOblig = Math.round(s.budgetTotal * s.budgetPct / 100);
+  s.budgetTotal    = parseInt(document.getElementById('bT-'+f).value)||0;
+  s.budgetPct      = parseInt(document.getElementById('pO-'+f).value)||0;
+  s.budgetOblig    = Math.round(s.budgetTotal * s.budgetPct / 100);
+  s.budgetPctCompl = parseInt(document.getElementById('pC-'+f).value)||0;
+  s.budgetCompl    = Math.round(s.budgetTotal * s.budgetPctCompl / 100);
 
   const xpO = getXP_oblig(f);
   const xpR = getXP_reco(f);
+  const xpC = getXP_compl(f);
   const xpTotal = xpO + xpR;
-  const bO = s.budgetOblig, bT = s.budgetTotal;
+  const bO = s.budgetOblig, bT = s.budgetTotal, bC = s.budgetCompl;
 
-  // Jauge Obligatoires — toujours bleue
+  // Jauge Obligatoires
   const pctO = bO>0 ? Math.min(100,(xpO/bO)*100) : 0;
   const overO = xpO > bO;
   document.getElementById('jO-'+f).style.width = pctO+'%';
@@ -436,6 +457,12 @@ function renderList(f) {
   document.getElementById('jR-'+f).style.width = (bT>0 ? Math.min(100,(xpR/bT)*100) : 0)+'%';
   document.getElementById('jRv-'+f).textContent = xpR+' XP';
 
+  // Jauge Complémentaires
+  const overC = xpC > bC;
+  document.getElementById('jC-'+f).style.width = (bC>0 ? Math.min(100,(xpC/bC)*100) : 0)+'%';
+  document.getElementById('jCv-'+f).textContent = xpC+' / '+bC+' XP';
+  document.getElementById('jCv-'+f).className = 'jauge-val'+(overC?' over':'');
+
   // Jauge Total (bleu O + ambre R + violet restant)
   const overT = xpTotal > bT;
   const pctTotalO = bT>0 ? Math.min(100, (xpO/bT)*100) : 0;
@@ -444,7 +471,6 @@ function renderList(f) {
   document.getElementById('jT-'+f).children[0].style.width = pctTotalO+'%';
   document.getElementById('jT-'+f).children[1].style.width = pctTotalR+'%';
   document.getElementById('jT-'+f).children[2].style.width = pctTotalC+'%';
-  const xpC = getXP_compl(f);
   const pO = bT > 0 ? Math.round(xpO / bT * 100) : 0;
   const pR = bT > 0 ? Math.round(xpR / bT * 100) : 0;
   const pC = bT > 0 && xpC > 0 ? Math.round(xpC / bT * 100) : 0;
@@ -602,6 +628,20 @@ function handleBtn(f, label, newState) {
     }
   }
 
+  // 3. Vérif budget complémentaire — uniquement si on passe en C
+  if (newState === 'C') {
+    const xpC = getXP_compl(f);
+    const own = (skillMap[label]||{}).xp||0;
+    const allP = getAllPrereqs(label); allP.delete(label);
+    let extraToC = 0;
+    allP.forEach(p => { if (getSkillStatus(f, p) === null) extraToC += (skillMap[p]||{}).xp||0; });
+    const newXpCompl = xpC + own + extraToC;
+    if (newXpCompl > s.budgetCompl) {
+      alert(`Budget complémentaire (${s.budgetPctCompl}% = ${s.budgetCompl} XP) dépassé.\n\nCe choix porterait les Complémentaires à ${newXpCompl} XP.`);
+      return;
+    }
+  }
+
   setSkillState(f, label, newState);
 
   // Cascade C : pré-requis null → C
@@ -628,8 +668,9 @@ function serializeState(f) {
     obligatoire:   [...s.obligatoire],
     recommande:    [...s.recommande],
     complementaire:[...s.complementaire],
-    budgetPct:     s.budgetPct,
-    budgetTotal:   s.budgetTotal
+    budgetPct:      s.budgetPct,
+    budgetTotal:    s.budgetTotal,
+    budgetPctCompl: s.budgetPctCompl
   };
 }
 
@@ -640,6 +681,7 @@ function deserializeState(f, data) {
   state[f].complementaire = new Set(data.complementaire || []);
   if (data.budgetTotal) { state[f].budgetTotal = data.budgetTotal; const el = document.getElementById('bT-'+f); if (el) el.value = data.budgetTotal; }
   if (data.budgetPct != null) { state[f].budgetPct = data.budgetPct; const el = document.getElementById('pO-'+f); if (el) el.value = data.budgetPct; }
+  if (data.budgetPctCompl != null) { state[f].budgetPctCompl = data.budgetPctCompl; const el = document.getElementById('pC-'+f); if (el) el.value = data.budgetPctCompl; }
   recomputePrereqs(f);
 }
 
