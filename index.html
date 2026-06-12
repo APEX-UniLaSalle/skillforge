@@ -413,12 +413,16 @@ function attachEvents(f) {
   ['pO','pR','bT'].forEach(id => document.getElementById(id+'-'+f).addEventListener('input', () => renderList(f)));
   ['search','typeF','domF','semF'].forEach(id => document.getElementById(id+'-'+f).addEventListener('input', () => renderList(f)));
   document.getElementById('reset-'+f).addEventListener('click', () => {
+    // Réinitialiser les filtres pour ne pas masquer le résultat du reset
+    document.getElementById('typeF-'+f).value = '';
+    document.getElementById('search-'+f).value = '';
+    document.getElementById('domF-'+f).value = '';
+    document.getElementById('semF-'+f).value = '';
     // Les Obligatoires sont conservés — on ne réinitialise que Recommandé et Complémentaire
     state[f].recommande = new Set();
     state[f].complementaire = new Set();
-    SKILLS_DATA.filter(s => f in s.filieres).forEach(skill => {
+    SKILLS_DATA.filter(sk => f in sk.filieres).forEach(skill => {
       if (!state[f].obligatoire.has(skill.label)) {
-        // Tout part en C par défaut (les wasObligatoire restent aussi en C)
         state[f].complementaire.add(skill.label);
       }
     });
