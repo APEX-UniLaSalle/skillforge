@@ -503,14 +503,14 @@ function renderList(f) {
   document.getElementById('jT-'+f).children[2].style.width = pctTotalC+'%';
   const pO = bT > 0 ? Math.round(xpO / bT * 100) : 0;
   const pR = bT > 0 ? Math.round(xpR / bT * 100) : 0;
-  const pC = bT > 0 && xpC > 0 ? Math.round(xpC / bT * 100) : 0;
-  const breakdown = (pO + pR + pC > 0)
-    ? `<br><span class="jauge-breakdown">` +
+  const pC = Math.max(0, 100 - pO - pR);
+  const breakdown = (pO + pR > 0)
+    ? `<span class="jauge-breakdown">` +
       `<span style="color:#3B82F6">${pO}%</span>&thinsp;O` +
       ` · <span style="color:#F59E0B">${pR}%</span>&thinsp;R` +
-      (pC > 0 ? ` · <span style="color:#8B5CF6">${pC}%</span>&thinsp;C` : '') +
+      ` · <span style="color:#8B5CF6">${pC}%</span>&thinsp;C` +
       `</span>` : '';
-  document.getElementById('jTv-'+f).innerHTML = `${xpTotal}&thinsp;/&thinsp;${bT}&thinsp;XP${breakdown}`;
+  document.getElementById('jTv-'+f).innerHTML = breakdown;
   document.getElementById('jTv-'+f).className = 'jauge-val'+(overT?' over':'');
 
   // Pills
