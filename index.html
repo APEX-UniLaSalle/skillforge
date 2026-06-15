@@ -394,11 +394,6 @@ function buildPanelHTML(f) {
           <span class="jauge-val" id="jRv-${f}">0 / ${bR} XP</span>
         </div>
         <div class="jauge-row">
-          <span class="jauge-label compl">Complémentaires</span>
-          <div class="jauge-bg"><div class="jauge-fill compl" id="jC-${f}" style="width:0%"></div></div>
-          <span class="jauge-val" id="jCv-${f}">0 XP</span>
-        </div>
-        <div class="jauge-row">
           <span class="jauge-label total">Total</span>
           <div class="jauge-bg" id="jTbg-${f}"><div class="jauge-fill-dual" id="jT-${f}"><div class="part-o" style="width:0%"></div><div class="part-r" style="width:0%"></div><div class="part-c" style="width:100%"></div></div></div>
           <span class="jauge-val" id="jTv-${f}">0 / ${bT} XP</span>
@@ -497,10 +492,6 @@ function renderList(f) {
   document.getElementById('jRv-'+f).textContent = xpR+' / '+bR+' XP';
   document.getElementById('jRv-'+f).className = 'jauge-val'+(overR?' over':'');
 
-  // Jauge Complémentaires (sans plafond)
-  document.getElementById('jC-'+f).style.width = (bT>0 ? Math.min(100,(xpC/bT)*100) : 0)+'%';
-  document.getElementById('jCv-'+f).textContent = xpC+' XP';
-  document.getElementById('jCv-'+f).className = 'jauge-val';
 
   // Jauge Total (bleu O + ambre R + violet restant)
   const overT = xpTotal > bT;
