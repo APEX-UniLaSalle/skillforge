@@ -143,18 +143,25 @@
   function checkPw() {
     const val = document.getElementById('pwInput').value;
     if (val === 'SkillQuest') {
-      document.getElementById('pwGate').style.display = 'none';
       sessionStorage.setItem('sq_auth','1');
       sessionStorage.setItem('sq_role','admin');
-    } else if (val === 'UniLaSalle@60') {
       document.getElementById('pwGate').style.display = 'none';
+      applyRoleUI();
+    } else if (val === 'UniLaSalle@60') {
       sessionStorage.setItem('sq_auth','1');
       sessionStorage.setItem('sq_role','df');
+      document.getElementById('pwGate').style.display = 'none';
+      applyRoleUI();
     } else {
       document.getElementById('pwError').style.display = 'block';
       document.getElementById('pwInput').value = '';
       document.getElementById('pwInput').focus();
     }
+  }
+  function applyRoleUI() {
+    userRole = sessionStorage.getItem('sq_role') || 'df';
+    const btnSave = document.getElementById('btnSave');
+    if (btnSave) btnSave.style.display = userRole === 'df' ? 'none' : '';
   }
   if (sessionStorage.getItem('sq_auth') === '1') document.getElementById('pwGate').style.display = 'none';
 </script>
@@ -186,7 +193,7 @@ const BUDGETS_TOTAL = {
 const FIREBASE_DB = 'https://skillquest-unilasalle-default-rtdb.firebaseio.com/skillquest';
 function sanitizeKey(s) { return s.replace(/[.#$\/\[\]]/g, '_'); }
 let userInteracted = false; // empêche loadFromCloud d'écraser un reset
-const userRole = sessionStorage.getItem('sq_role') || 'df';
+let userRole = sessionStorage.getItem('sq_role') || 'df';
 let currentTab = FILIERES[0];
 function setSyncStatus(msg) { const el=document.getElementById('syncStatus'); if(el) el.textContent=msg; }
 
@@ -841,10 +848,7 @@ FILIERES.forEach(f => { autoLoad(f); renderList(f); });
 // Synchroniser depuis Firebase
 loadFromCloud();
 // Appliquer les restrictions de rôle
-if (userRole === 'df') {
-  const btnSave = document.getElementById('btnSave');
-  if (btnSave) btnSave.style.display = 'none';
-}
+applyRoleUI();
 </script>
 </body>
 </html>
