@@ -141,9 +141,15 @@
 <script>
   document.getElementById('pwInput').addEventListener('keydown', e => { if (e.key === 'Enter') checkPw(); });
   function checkPw() {
-    if (document.getElementById('pwInput').value === 'UniLaSalle@60') {
+    const val = document.getElementById('pwInput').value;
+    if (val === 'SkillQuest') {
       document.getElementById('pwGate').style.display = 'none';
       sessionStorage.setItem('sq_auth','1');
+      sessionStorage.setItem('sq_role','admin');
+    } else if (val === 'UniLaSalle@60') {
+      document.getElementById('pwGate').style.display = 'none';
+      sessionStorage.setItem('sq_auth','1');
+      sessionStorage.setItem('sq_role','df');
     } else {
       document.getElementById('pwError').style.display = 'block';
       document.getElementById('pwInput').value = '';
@@ -158,7 +164,7 @@
   <span>Sélecteur de compétences obligatoires &amp; recommandées</span>
   <div class="profile-area">
     <span id="syncStatus" style="font-size:0.75rem;opacity:0.7;min-width:2rem;text-align:center"></span>
-    <button class="header-btn" onclick="saveToCloud()">💾 Sauvegarder</button>
+    <button id="btnSave" class="header-btn" onclick="saveToCloud()">💾 Sauvegarder</button>
     <button class="header-btn" onclick="exportState()">⬇ Exporter</button>
     <label class="header-btn">⬆ Importer<input type="file" accept=".json" onchange="importState(event)" style="display:none"></label>
   </div>
@@ -180,6 +186,8 @@ const BUDGETS_TOTAL = {
 const FIREBASE_DB = 'https://skillquest-unilasalle-default-rtdb.firebaseio.com/skillquest';
 function sanitizeKey(s) { return s.replace(/[.#$\/\[\]]/g, '_'); }
 let userInteracted = false; // empêche loadFromCloud d'écraser un reset
+const userRole = sessionStorage.getItem('sq_role') || 'df';
+let currentTab = FILIERES[0];
 function setSyncStatus(msg) { const el=document.getElementById('syncStatus'); if(el) el.textContent=msg; }
 
 const skillMap = {};
@@ -714,6 +722,7 @@ function handleBtn(f, label, newState) {
 }
 
 function switchTab(f) {
+  currentTab = f;
   document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.f===f));
   document.querySelectorAll('.tab-panel').forEach(p => p.classList.toggle('active', p.id==='panel-'+f));
 }
@@ -789,13 +798,18 @@ async function saveToCloud() {
 
 function exportState() {
   const data = { filieres: {} };
-  FILIERES.forEach(f => { data.filieres[f] = serializeState(f); });
+  if (userRole === 'df') {
+    data.filieres[currentTab] = serializeState(currentTab);
+  } else {
+    FILIERES.forEach(f => { data.filieres[f] = serializeState(f); });
+  }
   const json = JSON.stringify(data, null, 2);
   const blob = new Blob([json], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = 'skillquest_' + new Date().toISOString().slice(0,10) + '.json';
+  const suffix = userRole === 'df' ? '_' + currentTab.replace(/\s/g,'_') : '';
+  a.download = 'skillquest' + suffix + '_' + new Date().toISOString().slice(0,10) + '.json';
   a.click();
   URL.revokeObjectURL(url);
 }
@@ -807,8 +821,12 @@ function importState(e) {
     try {
       const data = JSON.parse(ev.target.result);
       const fData = data.filieres || data;
-      FILIERES.forEach(f => { if (fData[f]) deserializeState(f, fData[f]); });
-      FILIERES.forEach(f => renderList(f));
+      if (userRole === 'df') {
+        if (fData[currentTab]) { deserializeState(currentTab, fData[currentTab]); renderList(currentTab); }
+      } else {
+        // Admin : met à jour uniquement les filières présentes dans le JSON
+        FILIERES.forEach(f => { if (fData[f]) { deserializeState(f, fData[f]); renderList(f); } });
+      }
     } catch(err) { alert('Fichier invalide.'); }
   };
   reader.readAsText(file);
@@ -822,6 +840,11 @@ buildUI();
 FILIERES.forEach(f => { autoLoad(f); renderList(f); });
 // Synchroniser depuis Firebase
 loadFromCloud();
+// Appliquer les restrictions de rôle
+if (userRole === 'df') {
+  const btnSave = document.getElementById('btnSave');
+  if (btnSave) btnSave.style.display = 'none';
+}
 </script>
 </body>
 </html>
