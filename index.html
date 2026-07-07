@@ -173,6 +173,7 @@
     <span id="syncStatus" style="font-size:0.75rem;opacity:0.7;min-width:2rem;text-align:center"></span>
     <button id="btnSave" class="header-btn" onclick="saveToCloud()">💾 Sauvegarder</button>
     <button class="header-btn" onclick="exportState()">⬇ Exporter</button>
+    <button class="header-btn" onclick="exportExcel()">📊 Excel</button>
     <label class="header-btn">⬆ Importer<input type="file" accept=".json" onchange="importState(event)" style="display:none"></label>
   </div>
 </header>
@@ -819,6 +820,40 @@ function exportState() {
   a.download = 'skillquest' + suffix + '_' + new Date().toISOString().slice(0,10) + '.json';
   a.click();
   URL.revokeObjectURL(url);
+}
+
+function exportExcel() {
+  function doExport() {
+    const XLSX = window.XLSX;
+    const wb = XLSX.utils.book_new();
+    const filieresToExport = userRole === 'df' ? [currentTab] : FILIERES;
+    filieresToExport.forEach(f => {
+      const s = state[f];
+      const allO = new Set([...s.obligatoire, ...s.prereqs_oblig]);
+      const allR = new Set([...s.recommande, ...s.prereqs_reco]);
+      const rows = [['Sous-domaine', 'Compétence', 'Niveau']];
+      SKILLS_DATA
+        .filter(sk => f in sk.filieres)
+        .sort((a, b) => a.sousDomaine.localeCompare(b.sousDomaine) || a.label.localeCompare(b.label))
+        .forEach(sk => {
+          let niveau = 'C';
+          if (allO.has(sk.label)) niveau = 'O';
+          else if (allR.has(sk.label)) niveau = 'R';
+          rows.push([sk.sousDomaine, sk.label, niveau]);
+        });
+      const ws = XLSX.utils.aoa_to_sheet(rows);
+      XLSX.utils.book_append_sheet(wb, ws, f.replace('1A ', '').slice(0, 31));
+    });
+    const suffix = userRole === 'df' ? '_' + currentTab.replace(/\s/g,'_') : '';
+    XLSX.writeFile(wb, 'skillquest' + suffix + '_' + new Date().toISOString().slice(0,10) + '.xlsx');
+  }
+  if (window.XLSX) { doExport(); }
+  else {
+    const s = document.createElement('script');
+    s.src = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+    s.onload = doExport;
+    document.head.appendChild(s);
+  }
 }
 
 function importState(e) {
