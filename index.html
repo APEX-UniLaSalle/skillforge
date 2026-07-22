@@ -833,12 +833,11 @@ function exportExcel() {
       const allR = new Set([...s.recommande, ...s.prereqs_reco]);
       const rows = [['Sous-domaine', 'Compétence', 'Niveau']];
       SKILLS_DATA
-        .filter(sk => f in sk.filieres)
+        .filter(sk => getSkillStatus(f, sk.label) !== null)
         .sort((a, b) => a.sousDomaine.localeCompare(b.sousDomaine) || a.label.localeCompare(b.label))
         .forEach(sk => {
-          let niveau = 'C';
-          if (allO.has(sk.label)) niveau = 'O';
-          else if (allR.has(sk.label)) niveau = 'R';
+          const st = getSkillStatus(f, sk.label);
+          const niveau = (st==='O'||st==='PO') ? 'O' : (st==='R'||st==='PR') ? 'R' : 'C';
           rows.push([sk.sousDomaine, sk.label, niveau]);
         });
       const ws = XLSX.utils.aoa_to_sheet(rows);
